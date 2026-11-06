@@ -1,0 +1,5 @@
+.DS_Store
+/build/
+/validation/*.gif
+/validation/*.mp4
+/validation/*.png
