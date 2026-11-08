@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/cosinekitty/astronomy",
+  "commit": "865d3da7d8112bbc7911238052c6af4aaf877181",
+  "license": "MIT",
+  "retrieved_at": "2026-11-08T04:01:45.149578+00:00",
+  "files": [
+    {
+      "path": "astronomy.c",
+      "source": "https://raw.githubusercontent.com/cosinekitty/astronomy/865d3da7d8112bbc7911238052c6af4aaf877181/source/c/astronomy.c",
+      "sha256": "3ef243a3ee4c10fc05a5cb460d753e4e17eb2f57dad7892690e12599088717ac",
+      "bytes": 481421
+    },
+    {
+      "path": "astronomy.h",
+      "source": "https://raw.githubusercontent.com/cosinekitty/astronomy/865d3da7d8112bbc7911238052c6af4aaf877181/source/c/astronomy.h",
+      "sha256": "0c130854ee55b466dee98928ad72e3c5092bc862d37a2bba036c5568c811edbe",
+      "bytes": 63932
+    },
+    {
+      "path": "LICENSE",
+      "source": "https://raw.githubusercontent.com/cosinekitty/astronomy/865d3da7d8112bbc7911238052c6af4aaf877181/LICENSE",
+      "sha256": "a76df666a7db8a06f599d08e07c3ff74c4b250b50b49c43353af2bd5bb34604e",
+      "bytes": 1095
+    }
+  ]
+}

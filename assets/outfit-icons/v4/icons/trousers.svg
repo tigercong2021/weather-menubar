@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
+  <title>自然直腿长裤</title>
+  <path class="outline" d="M14.8 4.6c5.4-.4 13-.4 18.4 0-.1 5.7.9 12.5.8 18.4l-.9 20.2c-2.4.6-4.6.6-6.7 0l-1.5-24.1c-.1-1.3-.4-1.5-.9-1.7-.5.2-.8.4-.9 1.7l-1.5 24.1c-2.1.6-4.3.6-6.7 0L14 23c-.1-5.9.9-12.7.8-18.4Z" />
+  <g class="structure" stroke-width="0.95">
+    <path d="M14.7 8.1c6.2-.4 12.4-.4 18.6 0" />
+  </g>
+  <g class="detail" stroke-width="0.95">
+    <path d="M24 8v6.2c0 .8-.6 1.3-1.3 1.3" />
+  </g>
+</svg>

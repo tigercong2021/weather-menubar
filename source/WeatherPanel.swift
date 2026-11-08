@@ -1,5 +1,16 @@
 import SwiftUI
 
+@MainActor
+private final class WatchedCityExpansion: ObservableObject {
+    @Published var place: WeatherPlace?
+    @Published var pageIndex = 0
+    @Published var rowHeights: [WeatherPlace: CGFloat] = [:]
+    @Published var pageHeight: CGFloat = 0
+    @Published var detailNaturalHeight: CGFloat = 0
+    @Published var headerHeight: CGFloat = 23
+    @Published var footerHeight: CGFloat = 24
+}
+
 struct WeatherPanel: View {
     @ObservedObject var model: WeatherModel
     @ObservedObject var watched: WatchedCities
@@ -7,13 +18,50 @@ struct WeatherPanel: View {
     let renderer: WeatherIconRenderer
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var panelColorScheme
+    @Environment(\.weatherPanelMaximumHeight) private var maximumHeight
+    @StateObject private var watchedExpansion = WatchedCityExpansion()
 
     private let source = URL(string: "https://open-meteo.com/")!
     private let airSource = URL(string: "https://open-meteo.com/en/docs/air-quality-api")!
+    private let panelPadding: CGFloat = 16
+    private let panelSpacing: CGFloat = 14
     private var showsSettings: Bool { model.showsSettings }
 
+    private var watchedChromeHeight: CGFloat {
+        watchedExpansion.headerHeight + watchedExpansion.footerHeight + panelPadding * 2 + panelSpacing * 2
+    }
+
+    private var watchedBodyBudget: CGFloat? {
+        maximumHeight.flatMap { $0.isFinite ? max(1, $0 - watchedChromeHeight) : nil }
+    }
+
+    private var watchedPages: [Range<Int>] {
+        watchedCityPageRanges(rowHeights: watched.places.map { watchedExpansion.rowHeights[$0] ?? 96 },
+                             availableHeight: watchedBodyBudget.map { max(0, $0 - 2) })
+    }
+
+    private var watchedPageIndex: Int {
+        min(max(0, watchedExpansion.pageIndex), max(0, watchedPages.count - 1))
+    }
+
+    private var immersiveSnapshot: WeatherSnapshot? {
+        if model.showsMotionPreview {
+            return model.previewWeather.snapshot(at: model.previewWeather.sceneDate(relativeTo: model.now))
+        }
+        if model.showsWatchedWeather, let place = watched.selectedPlace {
+            return watched.state(for: place).snapshot.flatMap { $0.age(at: model.now) < 2 * 3600 ? $0 : nil }
+        }
+        guard model.showsLocalWeather, !model.hasLastPlace, model.age < 2 * 3600 else { return nil }
+        return model.snapshot
+    }
+
+    private var skyTime: Date {
+        if model.showsMotionPreview { return model.previewWeather.sceneDate(relativeTo: model.now) }
+        return model.now
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: panelSpacing) {
             header
             if showsSettings {
                 settings
@@ -30,10 +78,46 @@ struct WeatherPanel: View {
                 pageSelector
             }
         }
-        .padding(16)
+        .padding(panelPadding)
         .frame(width: 348)
         .fixedSize(horizontal: false, vertical: true)
+        .background {
+            if let snapshot = immersiveSnapshot {
+                ZStack {
+                    Color.clear.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+                    ImmersiveWeatherBackdrop(motion: motion, snapshot: snapshot, now: skyTime,
+                                             special: model.showsMotionPreview ? model.previewWeather.special : nil,
+                                             cycloneDemo: model.showsMotionPreview && model.previewWeather == .typhoon)
+                        .opacity(0.92)
+                }
+            } else if model.showsWatchedWeather {
+                Color.clear
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+            }
+        }
+        .overlayPreferenceValue(WeatherCardBoundsKey.self) { anchors in
+            if let snapshot = immersiveSnapshot {
+                GeometryReader { geometry in
+                    WeatherCardRainOverlay(motion: motion, snapshot: snapshot,
+                                           surfaces: model.showsWatchedWeather ? [] : anchors.map { geometry[$0] })
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
+        .environment(\.immersiveWeather, immersiveSnapshot != nil)
+        .environment(\.colorScheme, immersiveSnapshot == nil ? panelColorScheme : .dark)
         .environment(\.locale, Locale(identifier: "zh-Hans-CN"))
+        .preference(key: WatchedWeatherNaturalHeightKey.self,
+                    value: model.showsWatchedWeather ? watchedChromeHeight + watchedExpansion.pageHeight : 0)
+        .onChange(of: watched.places) { _, places in
+            if let expanded = watchedExpansion.place, !places.contains(expanded) {
+                watchedExpansion.place = nil
+            }
+            watchedExpansion.rowHeights = watchedExpansion.rowHeights.filter { places.contains($0.key) }
+            watchedExpansion.pageIndex = watchedPageIndex
+        }
+        .onChange(of: watchedPages) { _, _ in watchedExpansion.pageIndex = watchedPageIndex }
     }
 
     private var header: some View {
@@ -54,6 +138,7 @@ struct WeatherPanel: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .accessibilityAddTraits(.isHeader)
+                .help(title)
             Spacer(minLength: 8)
             if local {
                 Button { model.refresh() } label: {
@@ -97,6 +182,7 @@ struct WeatherPanel: View {
             .help(weather ? "打开设置" : "返回天气")
             .accessibilityLabel(weather ? "打开设置" : "返回天气")
         }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { watchedExpansion.headerHeight = $0 }
     }
 
     private var pageSelector: some View {
@@ -122,6 +208,7 @@ struct WeatherPanel: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { watchedExpansion.footerHeight = $0 }
     }
 
     private var conditions: some View {
@@ -132,6 +219,10 @@ struct WeatherPanel: View {
                     status(note, symbol: model.isStale || model.hasLastPlace ? "clock.arrow.circlepath" : "info.circle")
                 }
                 if !model.hasLastPlace, model.age < 2 * 3600 {
+                    AirQualityIndexLine(reading: model.visibleAirQuality, now: model.now,
+                                        isLoading: model.airQualityLoading, isUnavailable: model.airQualityUnavailable,
+                                        history: model.visibleAirQualityHistory)
+                    PrecipitationTrendCard(snapshot: snapshot, now: model.now)
                     let hours = snapshot.nextHours(at: model.now)
                     if !hours.isEmpty { forecast(hours, from: snapshot) }
                     WeatherDetailsGrid(snapshot: snapshot, now: model.now)
@@ -182,45 +273,11 @@ struct WeatherPanel: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    private func airColor(_ category: AirQualityCategory) -> Color {
-        switch category {
-        case .good: Color(red: 0.20, green: 0.68, blue: 0.43)
-        case .moderate: Color(red: 0.86, green: 0.66, blue: 0.13)
-        case .sensitiveGroups: Color(red: 0.94, green: 0.49, blue: 0.18)
-        case .unhealthy: Color(red: 0.84, green: 0.30, blue: 0.35)
-        case .veryUnhealthy: Color(red: 0.62, green: 0.36, blue: 0.81)
-        case .hazardous: Color(red: 0.55, green: 0.17, blue: 0.30)
-        }
-    }
-
-    @ViewBuilder
-    private func airQualityBadge(for snapshot: WeatherSnapshot) -> some View {
-        if let reading = model.visibleAirQuality, let aqi = reading.aqi, let category = reading.category {
-            let stale = reading.age(at: model.now) >= 2 * 3600
-            let pm25 = reading.pm25.map {
-                " · PM2.5 \($0.formatted(.number.precision(.fractionLength(0...1)))) μg/m³"
-            } ?? ""
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("AQI \(aqi)").font(.system(size: 11, weight: .semibold)).monospacedDigit()
-                Text(stale ? "\(category.label) · 旧数据" : category.label)
-                    .font(.system(size: 9)).foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(.background.opacity(0.58), in: RoundedRectangle(cornerRadius: 7))
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("空气质量指数 \(aqi)，\(category.label)\(stale ? "，旧数据" : "")")
-            .help("AQI · \(timeLabel(reading.validAt, in: snapshot, pattern: "M月d日 HH:mm"))\(pm25)")
-        } else {
-            Text(model.airQualityLoading ? "AQI 获取中" : model.airQualityUnavailable ? "AQI 暂不可用" : "AQI 暂缺")
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var watchedSummary: some View {
         Group {
-            if watched.places.isEmpty {
+            if let place = watchedExpansion.place, watched.places.contains(place) {
+                watchedDetailPage(place)
+            } else if watched.places.isEmpty {
                 VStack(spacing: 9) {
                     Image(systemName: "star").font(.system(size: 24, weight: .light))
                     Text("还没有关注城市").font(.system(size: 13, weight: .medium))
@@ -235,29 +292,176 @@ struct WeatherPanel: View {
                 .frame(maxWidth: .infinity, minHeight: 142)
                 .background(.quaternary.opacity(0.48), in: RoundedRectangle(cornerRadius: 11))
             } else {
-                ScrollView {
-                    VStack(spacing: 7) {
-                        ForEach(watched.places, id: \.self) { place in
-                            watchedRow(place)
-                        }
-                    }
-                }
-                .frame(height: min(408, CGFloat(watched.places.count) * 103 - 7))
+                watchedListPage
             }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) {
+            watchedExpansion.pageHeight = $0
+        }
+        .background(alignment: .top) {
+            // At most eight cards: measure every row at its actual width even
+            // when pagination hides it. This layer never receives input or AX.
+            VStack(spacing: 8) {
+                ForEach(watched.places, id: \.self) { place in
+                    watchedRow(place)
+                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+                            guard height.isFinite, height > 0,
+                                  watchedExpansion.rowHeights[place] != height else { return }
+                            watchedExpansion.rowHeights[place] = height
+                        }
+                }
+            }
+            .padding(1)
+            .fixedSize(horizontal: false, vertical: true)
+            .hidden()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 
-    private func watchedRow(_ place: WeatherPlace) -> some View {
+    private var watchedListPage: some View {
+        let pages = watchedPages
+        let index = watchedPageIndex
+        let range = pages.isEmpty ? 0..<0 : pages[index]
+        let places = Array(watched.places[range])
+        let naturalHeight = places.reduce(CGFloat(0)) { $0 + (watchedExpansion.rowHeights[$1] ?? 96) }
+            + CGFloat(max(0, places.count - 1)) * 8
+        let controlsHeight: CGFloat = pages.count > 1 ? 32 : 0
+        let budget = watchedBodyBudget.map { max(1, $0 - controlsHeight - 2) }
+        let scale = min(1, (budget ?? naturalHeight) / max(1, naturalHeight))
+        return VStack(spacing: 8) {
+            VStack(spacing: 8) {
+                ForEach(places, id: \.self) { place in
+                    watchedCityButton(place)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .scaleEffect(scale, anchor: .top)
+            .frame(height: naturalHeight * scale, alignment: .top)
+            if pages.count > 1 {
+                HStack {
+                    Button { watchedExpansion.pageIndex = index - 1 } label: {
+                        Label("上一页", systemImage: "chevron.left")
+                    }
+                    .disabled(index == 0)
+                    Spacer()
+                    Text("\(index + 1) / \(pages.count)")
+                        .monospacedDigit()
+                        .accessibilityLabel("第 \(index + 1) 页，共 \(pages.count) 页")
+                    Spacer()
+                    Button { watchedExpansion.pageIndex = index + 1 } label: {
+                        Label("下一页", systemImage: "chevron.right")
+                    }
+                    .disabled(index == pages.count - 1)
+                }
+                .font(.system(size: 10))
+                .buttonStyle(.plain)
+                .frame(height: 24)
+            }
+        }
+        .padding(1)
+    }
+
+    private func watchedDetailPage(_ place: WeatherPlace) -> some View {
+        let naturalHeight = watchedExpansion.detailNaturalHeight
+        let scale = min(1, (watchedBodyBudget ?? naturalHeight) / max(1, naturalHeight))
+        return VStack(spacing: 10) {
+            watchedCityButton(place, compact: true)
+            watchedDetails(place)
+        }
+        .padding(1)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) {
+            watchedExpansion.detailNaturalHeight = $0
+        }
+        // Only unusually short screens need this uniform fit. No card or
+        // detail is clipped, and the normal menu uses its unscaled size.
+        .scaleEffect(naturalHeight > 0 ? scale : 1, anchor: .top)
+        .frame(height: naturalHeight > 0 ? naturalHeight * scale : nil, alignment: .top)
+    }
+
+    private func watchedCityButton(_ place: WeatherPlace, compact: Bool = false) -> some View {
+        Button {
+            toggleWatchedCity(place)
+        } label: {
+            watchedRow(place, compact: compact)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(place.name)，\(watchedExpansion.place == place ? "返回城市列表" : "展开天气详情")")
+        .accessibilityAddTraits(watched.selectedPlace == place ? .isSelected : [])
+    }
+
+    private func toggleWatchedCity(_ place: WeatherPlace) {
+        watched.select(place)
+        watchedExpansion.place = watchedExpansion.place == place ? nil : place
+    }
+
+    @ViewBuilder
+    private func watchedDetails(_ place: WeatherPlace) -> some View {
+        let state = watched.state(for: place)
+        if let snapshot = state.snapshot, snapshot.age(at: model.now) < 2 * 3600 {
+            VStack(alignment: .leading, spacing: 10) {
+                let hours = snapshot.nextHours(at: model.now)
+                if !hours.isEmpty { forecast(hours, from: snapshot) }
+                WeatherDetailsGrid(snapshot: snapshot, now: model.now)
+            }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 6)
+        } else {
+            Text(state.isLoading ? "正在获取天气详情" : "天气详情暂不可用")
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .weatherGlassCard()
+        }
+    }
+
+    private func watchedRow(_ place: WeatherPlace, compact: Bool = false) -> some View {
         let state = watched.state(for: place)
         let snapshot = state.snapshot.flatMap { $0.age(at: model.now) < 2 * 3600 ? $0 : nil }
         let daylight = snapshot?.isDay(at: model.now)
         let air = watched.airQuality(for: place).flatMap { $0.age(at: model.now) < 6 * 3600 ? $0 : nil }
         let oldAir = (air?.age(at: model.now) ?? .infinity) >= 2 * 3600
-        let tint = oldAir ? nil : air?.category.map(airColor)
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(place.name).lineLimit(1)
+                HStack(spacing: 5) {
+                    if watched.selectedPlace == place {
+                        Circle().fill(.white).frame(width: 4, height: 4)
+                            .accessibilityHidden(true)
+                    }
+                    Text(place.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .help(place.name)
+                    if let snapshot {
+                        let kind = WeatherKind(code: snapshot.code)
+                        ForecastWeatherIcon(code: snapshot.code, daylight: daylight, size: 18)
+                            .accessibilityLabel(kind.label)
+                            .fixedSize()
+                        Text(temperatureText(snapshot.temperature))
+                            .font(.system(size: 13, weight: .semibold))
+                            .monospacedDigit()
+                            .fixedSize(horizontal: true, vertical: false)
+                        let range = snapshot.highLow(at: model.now)
+                        if range.high != nil || range.low != nil {
+                            Text("高 \(temperatureText(range.high)) · 低 \(temperatureText(range.low))")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .fixedSize(horizontal: true, vertical: false)
+                                .accessibilityLabel("最高 \(temperatureText(range.high))，最低 \(temperatureText(range.low))")
+                        }
+                    } else {
+                        Text(state.isLoading ? "获取中" : "—")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: watchedExpansion.place == place ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                }
                 HStack(spacing: 6) {
                     if let daylight {
                         Label(daylight ? "白天" : "夜间", systemImage: daylight ? "sun.max" : "moon.stars")
@@ -268,36 +472,15 @@ struct WeatherPanel: View {
                             .monospacedDigit()
                             .accessibilityLabel("空气质量指数 \(aqi)\(oldAir ? "，旧数据" : "")")
                     }
+                    if let snapshot, snapshot.age(at: model.now) >= 30 * 60 {
+                        Image(systemName: "clock").help("显示上次天气").accessibilityLabel("上次数据")
+                    }
                 }
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
-            if let snapshot {
-                let kind = WeatherKind(code: snapshot.code)
-                ForecastWeatherIcon(code: snapshot.code, daylight: daylight, size: 18)
-                    .accessibilityLabel(kind.label)
-                if snapshot.age(at: model.now) >= 30 * 60 {
-                    Image(systemName: "clock").help("显示上次天气").accessibilityLabel("上次数据")
-                }
-                let range = snapshot.highLow(at: model.now)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(temperatureText(snapshot.temperature))
-                        .font(.system(size: 13, weight: .semibold))
-                    if range.high != nil || range.low != nil {
-                        Text("高 \(temperatureText(range.high)) · 低 \(temperatureText(range.low))")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel("最高 \(temperatureText(range.high))，最低 \(temperatureText(range.low))")
-                    }
-                }
-                .monospacedDigit()
-                .frame(minWidth: 60, alignment: .trailing)
-            } else {
-                Text(state.isLoading ? "获取中" : "—").foregroundStyle(.secondary)
-            }
-            }
             .frame(minHeight: 33)
+            if !compact {
             if let snapshot {
                 let days = snapshot.nextDays(at: model.now)
                 if !days.isEmpty {
@@ -313,16 +496,17 @@ struct WeatherPanel: View {
                 Text(state.isLoading ? "正在加载未来三天预报" : "未来几天的预报暂缺")
                     .font(.caption2).foregroundStyle(.secondary)
             }
+            }
         }
         .font(.system(size: 12))
         .padding(8)
-        .frame(minHeight: 96, alignment: .topLeading)
-        .background {
-            WeatherSky(code: snapshot?.code, daylight: daylight, airTint: tint, compact: true)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityHidden(true)
+        .frame(minHeight: compact ? 49 : 96, alignment: .topLeading)
+        .weatherGlassCard(cornerRadius: 10)
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.white.opacity(watched.selectedPlace == place ? 0.48 : 0), lineWidth: 1)
+                .allowsHitTesting(false)
         }
-        .environment(\.colorScheme, skyColorScheme(daylight))
     }
 
     private func watchedDay(_ day: WeatherDay, in snapshot: WeatherSnapshot) -> some View {
@@ -404,84 +588,55 @@ struct WeatherPanel: View {
                                           windSpeed: snapshot.details?.windSpeed, gust: snapshot.gust,
                                           windDirection: snapshot.details?.windDirection)
         let daylight = snapshot.isDay(at: model.now)
-        let daylightProgress = snapshot.daylightProgress(at: model.now)
         let mixed = snapshot.hasMixedPrecipitation
         let canShowToday = !model.hasLastPlace && model.age < 2 * 3600
         let range = snapshot.highLow(at: model.now)
-        let reading = model.visibleAirQuality
-        let category = reading.flatMap { $0.age(at: model.now) < 2 * 3600 ? $0.category : nil }
-        let tint = category.map(airColor)
-        return VStack(spacing: 10) {
-            VStack(spacing: 2) {
-                HStack(spacing: 9) {
-                    CurrentWeatherIcon(motion: motion, renderer: renderer,
-                                       code: mixed ? 66 : snapshot.code, daylight: daylight, intensity: snapshot.intensity,
-                                       size: 42, gust: snapshot.gust)
-                        .accessibilityLabel(mixed ? "雨雪混合" : profile.label)
-                    Text(temperatureText(snapshot.temperature))
-                        .font(.system(size: 52, weight: .light, design: .rounded))
-                        .monospacedDigit()
-                        .accessibilityLabel("摄氏 \(temperatureText(snapshot.temperature))")
-                }
-                HStack(spacing: 6) {
-                    Text(mixed ? "雨雪混合" : profile.label)
-                        .font(.system(size: 13, weight: .medium))
-                    if let daylight {
-                        Label(daylight ? "白天" : "夜间", systemImage: daylight ? "sun.max" : "moon.stars")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                    }
+        return VStack(spacing: 6) {
+            Text(temperatureText(snapshot.temperature))
+                .font(.system(size: 68, weight: .thin, design: .rounded))
+                .monospacedDigit()
+                .shadow(color: .black.opacity(0.12), radius: 7, y: 2)
+                .accessibilityLabel("摄氏 \(temperatureText(snapshot.temperature))")
+            HStack(spacing: 6) {
+                CurrentWeatherIcon(motion: motion, renderer: renderer,
+                                   code: mixed ? 66 : snapshot.code, daylight: daylight,
+                                   intensity: snapshot.intensity, size: 20, gust: snapshot.gust)
+                    .accessibilityHidden(true)
+                Text(mixed ? "雨雪混合" : profile.label)
+                    .font(.system(size: 13, weight: .medium))
+            }
+            HStack(spacing: 12) {
+                if canShowToday && (range.high != nil || range.low != nil) {
+                    Text("最高 \(temperatureText(range.high))  最低 \(temperatureText(range.low))")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
             }
-            HStack(alignment: .bottom, spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
-                    if canShowToday && (range.high != nil || range.low != nil) {
-                        Text("最高 \(temperatureText(range.high))  最低 \(temperatureText(range.low))")
-                    }
-                    if canShowToday, let wind = profile.wind, wind >= .moderate {
-                        if let gust = snapshot.gust, gust >= 40 {
-                            Text("阵风 \(gust.formatted(.number.precision(.fractionLength(0)))) km/h")
-                        } else if let speed = snapshot.details?.windSpeed {
-                            Text("风速 \(speed.formatted(.number.precision(.fractionLength(0)))) km/h")
-                        }
-                    }
+            if canShowToday, let wind = profile.wind, wind >= .moderate {
+                if let gust = snapshot.gust, gust >= 40 {
+                    Text("阵风 \(gust.formatted(.number.precision(.fractionLength(0)))) km/h")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                } else if let speed = snapshot.details?.windSpeed {
+                    Text("风速 \(speed.formatted(.number.precision(.fractionLength(0)))) km/h")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                airQualityBadge(for: snapshot)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            ZStack {
-                WeatherSky(code: snapshot.code, daylight: daylight, airTint: nil,
-                           daylightProgress: daylightProgress)
-                    .accessibilityHidden(true)
-                WeatherScene(motion: motion, code: daylight == nil ? -1 : snapshot.code, isDay: daylight,
-                             intensity: snapshot.intensity, gust: snapshot.gust,
-                             windSpeed: snapshot.details?.windSpeed, windDirection: snapshot.details?.windDirection,
-                             daylightProgress: daylightProgress,
-                             special: mixed && daylight != nil ? .mixedPrecipitation : nil)
-                    .accessibilityHidden(true)
-                if let tint { WeatherAQIOverlay(tint: tint, daylight: daylight, localized: true) }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-        )
-        .environment(\.colorScheme, skyColorScheme(daylight))
-    }
-
-    private func skyColorScheme(_ daylight: Bool?) -> ColorScheme {
-        daylight.map { $0 ? .light : .dark } ?? panelColorScheme
+        .padding(.top, 8)
+        .padding(.bottom, 13)
     }
 
     private func forecast(_ hours: [WeatherHour], from snapshot: WeatherSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("未来几小时")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+            HStack {
+                Text("未来几小时")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer()
+                Label("降水概率", systemImage: "drop")
+                    .font(.system(size: 9))
+            }
+            .foregroundStyle(.secondary)
             HStack(spacing: 0) {
                 ForEach(hours) { hour in
                     let kind = WeatherKind(code: hour.code)
@@ -494,6 +649,12 @@ struct WeatherPanel: View {
                             .monospacedDigit()
                         ForecastWeatherIcon(code: hour.code, daylight: daylight, size: 18)
                             .frame(height: 20)
+                        Text(probabilityText(hour.rainProbability))
+                            .font(.system(size: 10, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle((hour.rainProbability ?? 0) > 0
+                                ? precipitationAccent : Color.secondary)
+                            .help("\(PrecipitationTrend.intervalLabel(for: hour, relativeTo: model.now, in: snapshot.locationTimeZone))降水概率：\(probabilityText(hour.rainProbability))")
                         Text(temperatureText(hour.temperature))
                             .font(.system(size: 11, weight: .semibold))
                             .monospacedDigit()
@@ -503,13 +664,24 @@ struct WeatherPanel: View {
                                         in: Capsule())
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 3)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(clock)，\(kind.label)，\(temperatureText(hour.temperature))")
+                    .accessibilityLabel("\(clock)，\(kind.label)，\(temperatureText(hour.temperature))，\(PrecipitationTrend.intervalLabel(for: hour, relativeTo: model.now, in: snapshot.locationTimeZone))降水概率\(probabilityText(hour.rainProbability))")
                 }
             }
         }
         .padding(10)
-        .background(.quaternary.opacity(0.48), in: RoundedRectangle(cornerRadius: 11))
+        .weatherGlassCard()
+    }
+
+    private var precipitationAccent: Color {
+        immersiveSnapshot != nil || panelColorScheme == .dark ? Color(red: 0.38, green: 0.77, blue: 0.96)
+            : Color(red: 0.08, green: 0.40, blue: 0.65)
+    }
+
+    private func probabilityText(_ value: Double?) -> String {
+        guard let value, value.isFinite, (0...100).contains(value) else { return "—" }
+        return "\(Int(value.rounded()))%"
     }
 
     private func status(_ message: String, symbol: String) -> some View {
@@ -605,7 +777,7 @@ struct WeatherPanel: View {
             }
             .buttonStyle(.borderless)
             Divider()
-            Text("天空背景随当地天气和昼夜变化，半透明色层表示 AQI 等级。")
+            Text("天空背景随当地天气和昼夜变化，AQI 以渐变色带和数值显示。")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -621,6 +793,8 @@ struct WeatherPanel: View {
             Link("图标 · weather-iconic", destination: URL(string: "https://github.com/konradmichalik/weather-iconic")!)
                 .font(.caption2)
                 .help("Konrad Michalik · CC BY-SA 3.0 US")
+            Link("天空背景 · Created with Grok（AI 生成）", destination: URL(string: "https://x.ai")!)
+                .font(.caption2)
         }
         .onAppear(perform: model.refreshLoginItemStatus)
     }
@@ -724,7 +898,7 @@ struct CurrentWeatherIcon: View {
     }
 }
 
-private struct ForecastWeatherIcon: View {
+struct ForecastWeatherIcon: View {
     let code: Int?
     let daylight: Bool?
     let size: CGFloat

@@ -91,11 +91,13 @@ final class WeatherModel: ObservableObject {
     @Published private(set) var airQuality: AirQualityReading?
     @Published private(set) var airQualityLoading = false
     @Published private(set) var airQualityUnavailable = false
+    @Published private(set) var airQualityHistory: AirQualityHistoryProfile?
 
     private let defaults: UserDefaults
     private let location = LocationService()
     private let weather = WeatherClient()
     private let airQualityClient = AirQualityClient()
+    private let airQualityHistoryClient: AirQualityHistoryClient
     private let airQualityLog = Logger(subsystem: "local.tigercong.weathermenu", category: "air-quality")
     private let network = NWPathMonitor()
     private let networkQueue = DispatchQueue(label: "local.tigercong.weathermenu.network")
@@ -103,7 +105,7 @@ final class WeatherModel: ObservableObject {
     private var active = true
     private var locationConfirmed = false
     private var target: WeatherPlace?
-    private var candidate: (point: WeatherCoordinate, firstSeen: Date)?
+    private var locationPolicy = AutomaticLocationPolicy()
     private var lastLocationAttempt = Date.distantPast
     private var nextLocationAttempt = Date.distantPast
     private var nextWeatherAttempt = Date.distantPast
@@ -117,16 +119,22 @@ final class WeatherModel: ObservableObject {
     private var airQualityPlace: WeatherPlace?
     private var nextAirQualityAttempt = Date.distantPast
     private var airQualityID = 0
-    private let fallbackCity = "当前位置（城市名暂不可用）"
+    private var airQualityHistoryWork: Task<Void, Never>?
+    private var airQualityHistoryKey: String?
+    private var airQualityHistoryID = 0
+    private var nextAirQualityHistoryAttempt = Date.distantPast
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, airQualityHistoryClient: AirQualityHistoryClient = .init()) {
         self.defaults = defaults
+        self.airQualityHistoryClient = airQualityHistoryClient
         self.preferences = defaults.data(forKey: "preferences.v1")
             .flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
         self.saved = defaults.data(forKey: "weather.v1")
             .flatMap { try? JSONDecoder().decode(SavedWeather.self, from: $0) }
         self.airQuality = defaults.data(forKey: "air-quality.v1")
             .flatMap { try? JSONDecoder().decode(AirQualityReading.self, from: $0) }
+        self.airQualityHistory = defaults.data(forKey: "air-quality-history.v1")
+            .flatMap { try? JSONDecoder().decode(AirQualityHistoryProfile.self, from: $0) }
         if mode == .manual {
             target = preferences.manualPlace
         } else if saved?.mode == .automatic {
@@ -162,6 +170,11 @@ final class WeatherModel: ObservableObject {
               airQuality.age(at: now) < 6 * 3600 else { return nil }
         return airQuality
     }
+    var visibleAirQualityHistory: AirQualityHistoryProfile? {
+        guard !hasLastPlace, let coordinate = snapshot?.place.coordinate,
+              let airQualityHistory, airQualityHistory.isCurrent(for: coordinate, at: now) else { return nil }
+        return airQualityHistory
+    }
     var hasLastPlace: Bool {
         guard let saved else { return false }
         if saved.mode != mode || saved.snapshot.place != target { return true }
@@ -171,6 +184,12 @@ final class WeatherModel: ObservableObject {
     var showMenuTemperature: Bool { snapshot != nil && age < 6 * 3600 }
     var isStale: Bool { age >= 30 * 60 }
     var showWeatherIcon: Bool { snapshot != nil && age < 2 * 3600 }
+    var menuOutfitAdvice: OutfitAdvice? {
+        // Location changes keep an explicitly labeled old temperature while a
+        // new request is in flight, but must not recommend old-location clothes.
+        guard !hasLastPlace, let snapshot else { return nil }
+        return OutfitAdvice.make(for: snapshot, at: now)
+    }
     var canAnimate: Bool {
         showWeatherIcon && animationEnabled && !hasLastPlace && snapshot?.isDay(at: now) != nil
             && WeatherKind(code: snapshot?.code) != .unknown
@@ -232,6 +251,15 @@ final class WeatherModel: ObservableObject {
         now = Date()
         runIfNeeded()
         refreshAirQualityIfNeeded()
+        refreshAirQualityHistoryIfNeeded()
+    }
+
+    func openPanelRefresh() {
+        let instant = Date()
+        if mode == .automatic, instant.timeIntervalSince(lastLocationAttempt) >= 60 {
+            nextLocationAttempt = .distantPast
+        }
+        pulse()
     }
 
     func suspend() {
@@ -249,8 +277,10 @@ final class WeatherModel: ObservableObject {
     func systemClockChanged() {
         nextLocationAttempt = .distantPast
         nextWeatherAttempt = .distantPast
-        candidate = nil
+        locationPolicy.reset()
         nextAirQualityAttempt = .distantPast
+        cancelAirQualityHistory()
+        nextAirQualityHistoryAttempt = .distantPast
         pulse()
     }
 
@@ -258,6 +288,7 @@ final class WeatherModel: ObservableObject {
         guard work == nil else { return }
         nextLocationAttempt = .distantPast
         nextWeatherAttempt = .distantPast
+        nextAirQualityHistoryAttempt = .distantPast
         pulse()
     }
 
@@ -268,7 +299,7 @@ final class WeatherModel: ObservableObject {
         savePreferences()
         target = mode == .manual ? preferences.manualPlace : nil
         locationConfirmed = false
-        candidate = nil
+        locationPolicy.reset()
         nextLocationAttempt = .distantPast
         nextWeatherAttempt = .distantPast
         failures = 0
@@ -350,7 +381,7 @@ final class WeatherModel: ObservableObject {
         preferences.manualPlace = place
         target = place
         locationConfirmed = false
-        candidate = nil
+        locationPolicy.reset()
         cityResults = []
         cityMessage = nil
         savePreferences()
@@ -369,7 +400,9 @@ final class WeatherModel: ObservableObject {
         generation += 1
         work?.cancel()
         work = nil
+        locationPolicy.reset()
         cancelAirQuality()
+        cancelAirQualityHistory()
     }
 
     private func authorizationChanged() {
@@ -391,6 +424,7 @@ final class WeatherModel: ObservableObject {
                 nextWeatherAttempt = .distantPast
             }
             if visibleAirQuality == nil { nextAirQualityAttempt = .distantPast }
+            if visibleAirQualityHistory == nil { nextAirQualityHistoryAttempt = .distantPast }
         }
         pulse()
     }
@@ -410,7 +444,7 @@ final class WeatherModel: ObservableObject {
             return
         }
         if mode == .automatic, !locationConfirmed {
-            if notice == .locating || notice == .permission || notice == .disabled {
+            if notice == .permission || notice == .disabled {
                 notice = .noFix
             }
             return
@@ -433,7 +467,7 @@ final class WeatherModel: ObservableObject {
         let id = generation
         notice = .locating
         lastLocationAttempt = now
-        nextLocationAttempt = now.addingTimeInterval(12 * 60)
+        nextLocationAttempt = now.addingTimeInterval(5 * 60)
         work = Task { [weak self] in
             guard let self else { return }
             do {
@@ -442,6 +476,7 @@ final class WeatherModel: ObservableObject {
                 await accept(fix, generation: id)
             } catch {
                 guard isCurrent(id) else { return }
+                locationPolicy.reset()
                 locationConfirmed = false
                 notice = .noFix
                 nextLocationAttempt = Date().addingTimeInterval(3 * 60)
@@ -454,43 +489,33 @@ final class WeatherModel: ObservableObject {
 
     private func accept(_ fix: LocationFix, generation id: Int) async {
         let point = WeatherCoordinate(latitude: fix.latitude, longitude: fix.longitude)
-        if let target {
-            let distance = point.distance(to: target.coordinate)
-            let threshold = max(8_000, fix.accuracy * 2)
-            if distance < threshold, target.name != fallbackCity {
-                candidate = nil
-                locationConfirmed = true
-                notice = online == false ? .offline : .idle
-                return
-            }
-            if distance >= threshold, distance < 24_000 {
-                if let candidate,
-                   point.distance(to: candidate.point) < max(9_000, fix.accuracy * 2),
-                   Date().timeIntervalSince(candidate.firstSeen) >= 30 {
-                    self.candidate = nil
-                } else {
-                    candidate = (point, lastLocationAttempt)
-                    locationConfirmed = false
-                    nextLocationAttempt = Date().addingTimeInterval(45)
-                    notice = .locating
-                    return
-                }
-            }
-        }
         var city: String?
         if online != false {
             city = try? await CityLookup.reverse(fix)
         }
         guard isCurrent(id) else { return }
-        let revised = WeatherPlace(name: city ?? fallbackCity, coordinate: point)
-        if revised != target {
-            target = revised
-            nextWeatherAttempt = .distantPast
-            failures = 0
+        switch locationPolicy.evaluate(current: target, coordinate: point, accuracy: fix.accuracy,
+                                       resolvedName: city, at: fix.timestamp) {
+        case .retain:
+            // A coarse fix cannot reconfirm a previously precise district.
+            locationConfirmed = fix.accuracy <= 500 || !(target?.name.contains("·") ?? false)
+            if !locationConfirmed { nextLocationAttempt = Date().addingTimeInterval(60) }
+            notice = !locationConfirmed ? .noFix : online == false ? .offline : .idle
+        case .confirm(let delay):
+            locationConfirmed = false
+            nextLocationAttempt = Date().addingTimeInterval(delay)
+            notice = .locating
+        case .accept(let revised):
+            if revised != target {
+                cancelAirQuality()
+                cancelAirQualityHistory()
+                target = revised
+                nextWeatherAttempt = .distantPast
+                failures = 0
+            }
+            locationConfirmed = true
+            notice = online == false ? .offline : .loading
         }
-        candidate = nil
-        locationConfirmed = true
-        notice = online == false ? .offline : .loading
     }
 
     private func beginWeather(_ place: WeatherPlace, uptime: TimeInterval) {
@@ -528,6 +553,7 @@ final class WeatherModel: ObservableObject {
             work = nil
             now = Date()
             refreshAirQualityIfNeeded()
+            refreshAirQualityHistoryIfNeeded()
         }
     }
 
@@ -595,6 +621,57 @@ final class WeatherModel: ObservableObject {
         airQualityWork?.cancel()
         airQualityWork = nil
         airQualityLoading = false
+    }
+
+    private func refreshAirQualityHistoryIfNeeded() {
+        // A newly confirmed location starts history immediately, even while
+        // its separate live-weather request is pending or has failed.
+        guard active, online != false, mode == .manual || locationConfirmed,
+              let place = target else {
+            cancelAirQualityHistory()
+            return
+        }
+        guard let key = AirQualityHistoryClient.cacheKey(for: place.coordinate, at: now) else { return }
+        if airQualityHistoryKey != key {
+            cancelAirQualityHistory()
+            airQualityHistoryKey = key
+            nextAirQualityHistoryAttempt = .distantPast
+        }
+        guard airQualityHistory?.isCurrent(for: place.coordinate, at: now) != true,
+              airQualityHistoryWork == nil,
+              now >= nextAirQualityHistoryAttempt else { return }
+        let id = airQualityHistoryID
+        let requestedAt = now
+        nextAirQualityHistoryAttempt = now.addingTimeInterval(6 * 3600)
+        airQualityHistoryWork = Task { [weak self] in
+            guard let self else { return }
+            defer { if airQualityHistoryID == id { airQualityHistoryWork = nil } }
+            do {
+                let profile = try await airQualityHistoryClient.fetch(for: place.coordinate, now: requestedAt)
+                let completedAt = Date()
+                guard !Task.isCancelled, airQualityHistoryID == id, active,
+                      mode == .manual || locationConfirmed,
+                      let currentTarget = target,
+                      AirQualityHistoryClient.cacheKey(for: currentTarget.coordinate, at: completedAt) == key,
+                      profile.isCurrent(for: currentTarget.coordinate, at: completedAt) else { return }
+                airQualityHistory = profile
+                if let bytes = try? JSONEncoder().encode(profile) {
+                    defaults.set(bytes, forKey: "air-quality-history.v1")
+                }
+            } catch {
+                guard !Task.isCancelled, airQualityHistoryID == id else { return }
+                let failure = error as NSError
+                airQualityLog.notice("Air quality history fetch failed: \(failure.domain, privacy: .public) (\(failure.code, privacy: .public))")
+            }
+        }
+    }
+
+    private func cancelAirQualityHistory() {
+        guard airQualityHistoryWork != nil else { return }
+        airQualityHistoryID += 1
+        airQualityHistoryWork?.cancel()
+        airQualityHistoryWork = nil
+        nextAirQualityHistoryAttempt = .distantPast
     }
 }
 

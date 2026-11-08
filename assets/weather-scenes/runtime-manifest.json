@@ -1,0 +1,197 @@
+{
+  "source": "Created with Grok; see ASSET-NOTICE.md",
+  "files": {
+    "runtime/clear-day-atmosphere-compact.jpg": {
+      "sha256": "f09860cf0430ae56e8ef3b8124ee94e360d8b4dc49742f753e3cdd9211b7a0a1",
+      "bytes": 4634
+    },
+    "runtime/clear-day-atmosphere-compact.mp4": {
+      "sha256": "daf15954d47e9a7487fa8846d5650ad29008269b731946715c5e4b2894c1d553",
+      "bytes": 71922
+    },
+    "runtime/clear-day-atmosphere.jpg": {
+      "sha256": "558dda92372bc1f209ac65160620c7e1047aa133cc6bbda14e22943d90381e58",
+      "bytes": 21084
+    },
+    "runtime/clear-day-atmosphere.mp4": {
+      "sha256": "52786cf67857b80e42f886d7990d18a7f28ac2e1654149c62f34cbfb95c95411",
+      "bytes": 248645
+    },
+    "runtime/clear-day-compact.jpg": {
+      "sha256": "3d75443bc52379af0d4371987d9ff51f83f43123330753d2ecdfbdd38df2f3ad",
+      "bytes": 4878
+    },
+    "runtime/clear-day-compact.mp4": {
+      "sha256": "abac3bbe69cffb7ac6b115e05009b66495c9ad5de7ae8b0672d4f5eec380e425",
+      "bytes": 40082
+    },
+    "runtime/clear-day.jpg": {
+      "sha256": "cd5c3bc54cd51538aeb6b4b39ee2415b6687face6d8ea0a9dfc20ee6110e5ed1",
+      "bytes": 20308
+    },
+    "runtime/clear-day.mp4": {
+      "sha256": "aebd8a586cf53c8dc94a1a2447bdd4614c348040af33518feae0cbec2ecf96be",
+      "bytes": 157788
+    },
+    "runtime/clear-night-compact.jpg": {
+      "sha256": "161c46657189e0d719d4990a8b1b5e6c526df9bb345049adf2b14f4809ceb854",
+      "bytes": 3138
+    },
+    "runtime/clear-night-compact.mp4": {
+      "sha256": "810b7701864ad97e4fe834fb06168e08a919fe781ea61b2934cd91bb29bed541",
+      "bytes": 48261
+    },
+    "runtime/clear-night.jpg": {
+      "sha256": "9785983af6fff093fecb9fbc85cd9b2f78584ad9e3470270b4f4e8aa4fd28ebb",
+      "bytes": 9964
+    },
+    "runtime/clear-night.mp4": {
+      "sha256": "129238d52292c16edea0caca12109c332a6cffd26da46f15c2720c53a6b03478",
+      "bytes": 144503
+    },
+    "runtime/dawn-dusk-compact.jpg": {
+      "sha256": "f4a71ed445c992fc7af18737a9aabfe735e7eeeb9a4fca7293609b929143341c",
+      "bytes": 4261
+    },
+    "runtime/dawn-dusk-compact.mp4": {
+      "sha256": "0527715a38c8350d56c8792dd5f906cfbf7d6bbc3b509fcbe9fe31dfcd8a9075",
+      "bytes": 43433
+    },
+    "runtime/dawn-dusk.jpg": {
+      "sha256": "2b07dbd745495b6e02683c63741212fa515a2bb44ca5108d4c6a623ecf0b7493",
+      "bytes": 16261
+    },
+    "runtime/dawn-dusk.mp4": {
+      "sha256": "0895e88b00971fa97743ac3878ad251ab3c5f55a4e30584874228bd085d6925d",
+      "bytes": 140261
+    },
+    "runtime/fog-compact.jpg": {
+      "sha256": "a762e4f5ed28d1c6fa542a4c418a52fecf3e579f9324f54db50061b90b3539b8",
+      "bytes": 2400
+    },
+    "runtime/fog-compact.mp4": {
+      "sha256": "5ce38276f5d90d4414cc7ccdd848501c71dcab0bd69424f680a9a84671892614",
+      "bytes": 41721
+    },
+    "runtime/fog.jpg": {
+      "sha256": "737a211b27cdd5e65aed2c4f28ba9d7514e31e5f4cf8e8beff25d34ead8b0328",
+      "bytes": 11203
+    },
+    "runtime/fog.mp4": {
+      "sha256": "87cde6d1f0991171bd5421f13b89a1c85b61ba36a22fbf850b32a8f760135a87",
+      "bytes": 147625
+    },
+    "runtime/milky-way-night-compact.jpg": {
+      "sha256": "d1cf8e3d2de5fd22708d05729f05acce77279a39aeb7debd2d0b3a6618dbb8f8",
+      "bytes": 42510
+    },
+    "runtime/milky-way-night-compact.mp4": {
+      "sha256": "a3569b621ce69151d09a6514a712a56bf3baede6374ea71d7997368d0803737f",
+      "bytes": 577876
+    },
+    "runtime/milky-way-night.jpg": {
+      "sha256": "5726853990ec1d72130dda24a2d6aba069224d7c121633227db43accc8b77ee8",
+      "bytes": 146752
+    },
+    "runtime/milky-way-night.mp4": {
+      "sha256": "9b936d34152d79346bd3955df516b8f6e0d7cfa6c22e3ef9b2f1c0af477223ba",
+      "bytes": 1762878
+    },
+    "runtime/overcast-compact.jpg": {
+      "sha256": "b6f3fea58c3315ac470171268e23a094367061ac4839f072cc14819184cd036d",
+      "bytes": 2602
+    },
+    "runtime/overcast-compact.mp4": {
+      "sha256": "1864f442a66a81797d3a3b72715e2dd63693cf407fd3a01543865f912dbbbfe6",
+      "bytes": 65060
+    },
+    "runtime/overcast.jpg": {
+      "sha256": "8153bdd8fe914520e7b0b3d85cebcb894417d1253bd7ba0544e8b2434aa2e608",
+      "bytes": 14304
+    },
+    "runtime/overcast.mp4": {
+      "sha256": "995e7dfa8d642ff78db9312c5a7f664fd7669c88aa12d1dae72d4fea32896163",
+      "bytes": 210008
+    },
+    "runtime/partly-cloudy-compact.jpg": {
+      "sha256": "8de162744d481c89acdcb87aac95d807a76087d52125aab361cfe27159afcc1d",
+      "bytes": 14984
+    },
+    "runtime/partly-cloudy-compact.mp4": {
+      "sha256": "72da771d2e14dc25d16985baa1870d841bc5142a5de989bc7e3e885b1e335218",
+      "bytes": 115952
+    },
+    "runtime/partly-cloudy-night-compact.jpg": {
+      "sha256": "1c56ffc645f739201994f421a45da3c644792ce539d987c12125d81bba506b69",
+      "bytes": 30716
+    },
+    "runtime/partly-cloudy-night-compact.mp4": {
+      "sha256": "51e96c1782db685d9c41cbfe6c5d776cb43c6798ecbcca8ce5209450d37272bc",
+      "bytes": 432915
+    },
+    "runtime/partly-cloudy-night.jpg": {
+      "sha256": "46a6dfc3e0854f428aaace072811afe11adb47b0414ea624965311c3e1b4cf92",
+      "bytes": 122727
+    },
+    "runtime/partly-cloudy-night.mp4": {
+      "sha256": "6a636041dab3e266cd7a6e12118835f7730f67fe33bbae0b489dfc60245ae118",
+      "bytes": 1408315
+    },
+    "runtime/partly-cloudy.jpg": {
+      "sha256": "aa9025d8b998b1a20146da3b97326cc804a284239b9a68a249f9890c61054110",
+      "bytes": 57228
+    },
+    "runtime/partly-cloudy.mp4": {
+      "sha256": "2f7ab4e5922c2a7396e0e06d88a351f695bff9beacefa9888a96e5ee27f35370",
+      "bytes": 391827
+    },
+    "runtime/rain-clouds-compact.jpg": {
+      "sha256": "bbc124080d0c25222a96d4246595aae8fe250ecf18b4fbee724f5ba2ad58a2bb",
+      "bytes": 5266
+    },
+    "runtime/rain-clouds-compact.mp4": {
+      "sha256": "5ff473fcac768209419228d32a2461d31ec2a326f572d14ea27bd9d2c62595ba",
+      "bytes": 49658
+    },
+    "runtime/rain-clouds.jpg": {
+      "sha256": "89000eb0060704c2d6afeccc2bd57661eb3425727eaa73a105f941b279a57950",
+      "bytes": 14025
+    },
+    "runtime/rain-clouds.mp4": {
+      "sha256": "cc7fd6818fb5498bdfb9918f5464780f6d9abfde986450a88e22b21597850e70",
+      "bytes": 150179
+    },
+    "runtime/snow-clouds-compact.jpg": {
+      "sha256": "a4f33005be3b373ca860dbc7e38539a36c9b823a6f60db62c46691438fdb9c03",
+      "bytes": 3603
+    },
+    "runtime/snow-clouds-compact.mp4": {
+      "sha256": "fb5a31c56cc027c3ec86927c38c7ee9ca1013dee82a89c702bcf3c19db7354c5",
+      "bytes": 63105
+    },
+    "runtime/snow-clouds.jpg": {
+      "sha256": "279a3ee1d5e78e6517330bb20b5113ad6ae09acde9e3dba98c300e0f37e11b08",
+      "bytes": 16839
+    },
+    "runtime/snow-clouds.mp4": {
+      "sha256": "c083e745d2e435141155946b3cadef6c94bb5c5d190137ae6c41cba0c9cfcee8",
+      "bytes": 224458
+    },
+    "runtime/storm-clouds-compact.jpg": {
+      "sha256": "25a294d13f6ab5e804de21b3a1f2efe766ce919dd501be4b3d9b3e2da8fb407c",
+      "bytes": 4891
+    },
+    "runtime/storm-clouds-compact.mp4": {
+      "sha256": "789786781340710ecee94d5617caca15a2e52184b707af3fb3304e10b2e4e60b",
+      "bytes": 78396
+    },
+    "runtime/storm-clouds.jpg": {
+      "sha256": "62a68fdabe23e410454d03e3ad28da80d9e6a2191b0004d095d4782c9ac02df2",
+      "bytes": 22262
+    },
+    "runtime/storm-clouds.mp4": {
+      "sha256": "c5a4d51ef4f2f8db8b9b21f37581a3895d7c7653822eaed39ba66972eb6f9e4a",
+      "bytes": 229924
+    }
+  }
+}

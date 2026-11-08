@@ -46,6 +46,8 @@ final class WatchedCities: ObservableObject {
     private let client: WeatherClient
     private let airQualityClient: AirQualityClient
     @Published private(set) var places: [WeatherPlace]
+    /// Selection affects only the watched-page sky for this app session.
+    @Published private(set) var selectedPlace: WeatherPlace?
     @Published private var states: [Key: State] = [:]
     @Published private var airReadings: [Key: AirQualityReading] = [:]
     private var inFlight: [Key: Task<Void, Never>] = [:]
@@ -67,9 +69,15 @@ final class WatchedCities: ObservableObject {
             if restored.count == Self.maxCities { break }
         }
         places = restored
+        selectedPlace = restored.first
     }
 
     var isFull: Bool { places.count >= Self.maxCities }
+
+    func select(_ place: WeatherPlace) {
+        guard places.contains(place), selectedPlace != place else { return }
+        selectedPlace = place
+    }
 
     func state(for place: WeatherPlace) -> State {
         states[Key(place)] ?? .waiting
@@ -89,6 +97,7 @@ final class WatchedCities: ObservableObject {
         guard !places.contains(where: { Self.sameCity($0, place) }) else { return .alreadyWatched }
         guard !isFull else { return .limitReached }
         places.append(place)
+        if selectedPlace == nil { selectedPlace = places.first }
         savePlaces()
         refreshIfNeeded()
         return .added
@@ -97,6 +106,7 @@ final class WatchedCities: ObservableObject {
     func remove(_ place: WeatherPlace) {
         guard let index = places.firstIndex(of: place) else { return }
         places.remove(at: index)
+        if selectedPlace == place { selectedPlace = places.first }
         savePlaces()
         let key = Key(place)
         inFlight[key]?.cancel()

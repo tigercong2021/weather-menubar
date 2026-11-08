@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" width="48" height="48">
+  <title>宽檐遮阳帽</title>
+  <path d="M14 27C15.1 23.4 15.1 17.6 17.4 13.6C20.6 10.8 27.6 10.5 30.8 13.5C33.1 17.5 33.2 23.2 34.2 27" />
+  <path d="M14.2 26.1C9.5 27.2 6.6 29.1 5.3 31.8C3.7 35.2 13.7 38 23.7 38.2C34 38.4 43 35.1 42.7 32.2C42.4 29.7 38.6 27.4 34 26.2" />
+  <path d="M14 27C18.9 29.7 28.6 30 34.2 27" stroke-width="0.95" />
+  <g class="detail" stroke-width="0.95">
+    <path d="M15 22.9C20.1 25.1 28.4 25.2 33.2 23" />
+    <path d="M8.6 33.1C12.4 34.7 17.3 35.5 22.1 35.6" />
+  </g>
+</svg>

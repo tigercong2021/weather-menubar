@@ -1,0 +1,160 @@
+{
+  "status": "user-approved-2026-11-08-compact-integrated-in-1.1.5",
+  "icons": 15,
+  "variants": [
+    "detail",
+    "compact"
+  ],
+  "files": [
+    {
+      "path": "icons/beanie.svg",
+      "sha256": "4a4979eaed0ee2ef12185e1466c5b7ebd2d59e5f089fe8776d5075dee7288475",
+      "bytes": 688
+    },
+    {
+      "path": "icons/boots.svg",
+      "sha256": "06de5494a4e76ffa00ff73ab08c635d4ea168e2687dad0ba44aba5fa8ddfff60",
+      "bytes": 744
+    },
+    {
+      "path": "icons/gloves.svg",
+      "sha256": "9c9b378dc221df82494d2363779a49929898200dadc4273ae59d2699939923ce",
+      "bytes": 748
+    },
+    {
+      "path": "icons/knit.svg",
+      "sha256": "1d7475f32149d33cabc6a2eb3829e6de9f4e6560208d399554710bdfaa148ca0",
+      "bytes": 886
+    },
+    {
+      "path": "icons/light-jacket.svg",
+      "sha256": "e338939e6d11dd3f1eb089ffcad691ab9d17b0957dd50ea4a6be1f412012002c",
+      "bytes": 870
+    },
+    {
+      "path": "icons/long-sleeve.svg",
+      "sha256": "e5849aefb53275a9065abf9f13b63dd8ec1d5b95be3fcde30c0ff19226f437d9",
+      "bytes": 815
+    },
+    {
+      "path": "icons/puffer.svg",
+      "sha256": "2c45183804bd757f5104daa55c56fa45b5dba9fc869841073dba37f16d5f7896",
+      "bytes": 1678
+    },
+    {
+      "path": "icons/scarf.svg",
+      "sha256": "86783fc83fa20ca35678aa5a773973d2669fb1a6430826e948946922a2e434fc",
+      "bytes": 830
+    },
+    {
+      "path": "icons/shell.svg",
+      "sha256": "538802ab3b77dde81a86871fc342c4de0b0e340da858e4a9ce9912f0db067e79",
+      "bytes": 934
+    },
+    {
+      "path": "icons/short-sleeve.svg",
+      "sha256": "772fff5b8c89234a76d154d711ec5e9c5ab3fd5f8676f1b9211c8e51d44b5091",
+      "bytes": 672
+    },
+    {
+      "path": "icons/shorts.svg",
+      "sha256": "efab6a2a6de3bd8328851f459982deb229eb44e9d42b312bd6b7f92d8c45b514",
+      "bytes": 653
+    },
+    {
+      "path": "icons/sun-hat.svg",
+      "sha256": "2c7f2bd79a5724ae52bfd4b7cd1efcd9dc5e98b7d2cbd12217cc8200103549fa",
+      "bytes": 695
+    },
+    {
+      "path": "icons/sunglasses.svg",
+      "sha256": "7ef43c07eed0fc2e8950cafd90aa98184d56aa8dd9b3d02ae52b46e6603ddaab",
+      "bytes": 878
+    },
+    {
+      "path": "icons/trousers.svg",
+      "sha256": "c5d45eaecac085cc193a3a07c0bc55724afef13a71073f57b2462cb55523b16c",
+      "bytes": 639
+    },
+    {
+      "path": "icons/umbrella.svg",
+      "sha256": "bda8423cb09e251b31252e326640f9bd2cdf5bdf4817c3d2b08d55eb3fea4711",
+      "bytes": 651
+    },
+    {
+      "path": "compact/beanie.svg",
+      "sha256": "9b3155527bba7a66ff806d147d9a46450c5f2f5793c8254b19860eb202faec51",
+      "bytes": 438
+    },
+    {
+      "path": "compact/boots.svg",
+      "sha256": "4323d1b41a4a602c4fd88b5e3210df1e3a079e5d9073db097b9e66e0dadd905e",
+      "bytes": 530
+    },
+    {
+      "path": "compact/gloves.svg",
+      "sha256": "7b258bf47e678bdb654378e2816938c288d58e85558c2404918ceade6e09edf4",
+      "bytes": 571
+    },
+    {
+      "path": "compact/knit.svg",
+      "sha256": "abe179a3b1c36e9837a5d58b87cc6b76d8ea1cfa14aad552d2b78846540ce316",
+      "bytes": 732
+    },
+    {
+      "path": "compact/light-jacket.svg",
+      "sha256": "eaf35bae483c6f46fb313f8dca826b2ee4157f612b5d6267e8daf8c376088c02",
+      "bytes": 759
+    },
+    {
+      "path": "compact/long-sleeve.svg",
+      "sha256": "acfbe0ee7f55caa7e1901286dc33f6b0ee2d72b76451e18d8bfe9cb308b9d862",
+      "bytes": 698
+    },
+    {
+      "path": "compact/puffer.svg",
+      "sha256": "e25571c050ace92ff84b2fb33f1dbd215dedae934fac7dbe0675ea6078eee893",
+      "bytes": 1571
+    },
+    {
+      "path": "compact/scarf.svg",
+      "sha256": "c3e4481f697ef710e5ab3514ee964f40329cb938aa3888db17bb2a0d3b25493e",
+      "bytes": 600
+    },
+    {
+      "path": "compact/shell.svg",
+      "sha256": "b9c0ac98687ef8954dbc08da04d056113ded158dd35eeab36c0831459f246561",
+      "bytes": 841
+    },
+    {
+      "path": "compact/short-sleeve.svg",
+      "sha256": "0f2895e0e9f1150eca2e489addee9c09096232acb155911069b0fb8791ff0149",
+      "bytes": 527
+    },
+    {
+      "path": "compact/shorts.svg",
+      "sha256": "c2c121099c154f79d7080588198deec328980e30f6ed9d7979b4540fc92068e3",
+      "bytes": 533
+    },
+    {
+      "path": "compact/sun-hat.svg",
+      "sha256": "742ec281e10d7d00a0bb81af265e659e8b1da68e807ee46a389c916a3efc4b51",
+      "bytes": 536
+    },
+    {
+      "path": "compact/sunglasses.svg",
+      "sha256": "6745ba7af2037dfe3ebac051a77bcc809a0e228d070cd14dba08b59d51532ef8",
+      "bytes": 773
+    },
+    {
+      "path": "compact/trousers.svg",
+      "sha256": "6dc1426b8c3b96d0e1d190acbc23459bcaea6858da01f5c5ca235773bc2446bf",
+      "bytes": 544
+    },
+    {
+      "path": "compact/umbrella.svg",
+      "sha256": "0a28a1c11775dfc1d5993ebde0c77c06f7680081fcfb1f0874d78b00aa31a2ca",
+      "bytes": 514
+    }
+  ]
+}

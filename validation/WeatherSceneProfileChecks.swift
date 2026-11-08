@@ -22,6 +22,14 @@ struct WeatherSceneProfileChecks {
         expect(thunder.lightning && thunder.hail == nil && heavyThunder.lightning && heavyThunder.rain == .heavy
                && hail.lightning && hail.hail == .heavy,
                "Thunder and hail must use the source condition, not precipitation alone.")
+        for rate in [1.0, 3.0] {
+            let heavyHail = WeatherSceneProfile(code: 99, intensity: rate)
+            expect(heavyHail.rain == .moderate && heavyHail.hail == .heavy && heavyHail.lightning,
+                   "Heavy hail alone must not force the heavy-rain visual tier.")
+        }
+        let heavyHailAndRain = WeatherSceneProfile(code: 99, intensity: 9)
+        expect(heavyHailAndRain.rain == .heavy && heavyHailAndRain.hail == .heavy && heavyHailAndRain.lightning,
+               "A strong modeled rain rate can retain heavy rain alongside heavy hail.")
         expect(WeatherSceneProfile(code: 75, intensity: 0).snow == .heavy &&
                WeatherSceneProfile(code: 71, intensity: 0).snow == .light,
                "Light and heavy snow must follow the weather code.")

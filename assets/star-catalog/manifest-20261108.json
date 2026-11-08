@@ -1,0 +1,82 @@
+{
+  "createdDate": "2026-11-08",
+  "scope": "Personal weather menu-bar local trial. No upload or public publication performed.",
+  "provider": "David Nash / Astronexus",
+  "upstreamRepository": "https://github.com/astronexus/HYG-Database",
+  "upstreamCommit": "c7f7f883fe678cc7680169a50ccd7dcc49b060ce",
+  "upstreamMaintenanceNote": "Pinned archived v4.1 snapshot; author has moved later development to https://codeberg.org/astronexus/hyg.",
+  "sourceBlobSHA1": "ba2dec4eb0f6768914c7fc1051258100214ddf84",
+  "sources": [
+    {
+      "path": "original/hygdata_v41.csv",
+      "sha256": "d9f69fd86bbf90a4e4d52b4c5c53eacfa6dfc0bfdef85bfd94f095e0bebe4ebd",
+      "bytes": 33932548
+    },
+    {
+      "path": "original/HYG-LICENSE.md",
+      "sha256": "f404190403d31e0ce7223f4cb7af954485ad88077358330754dc5c892a856627",
+      "bytes": 422
+    },
+    {
+      "path": "original/HYG-README.md",
+      "sha256": "81f765951e60131e49ccc91376815791e130ad1db46047eb1384d3ba6bcb5af4",
+      "bytes": 6416
+    },
+    {
+      "path": "original/CC-BY-SA-4.0.txt",
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+      "bytes": 20138
+    }
+  ],
+  "license": "CC-BY-SA-4.0",
+  "licenseURL": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "adaptedDataLicense": "CC-BY-SA-4.0",
+  "filter": {
+    "maximumApparentVisualMagnitude": 3,
+    "excludeSun": true,
+    "originalRows": 119626,
+    "selectedRows": 179,
+    "epochAndEquinox": "J2000.0",
+    "distanceParsecToLightYear": 3.262
+  },
+  "checks": {
+    "sourceHashesVerified": true,
+    "coordinateUnitsCheckedAgainstRadianColumns": true,
+    "allDistancesPositiveAndBelowUnknownSentinel": true,
+    "uniqueIDs": true,
+    "northernStars": 78,
+    "southernStars": 101,
+    "coverageGrid": "latitude -90...90 step 5 degrees; local sidereal time 0...23.75 step 0.25 hours",
+    "minimumHighestStarAltitudeOnCoverageGridDegrees": 66.568511,
+    "maxCatalogProperMotionMasPerYear": 3709.61608
+  },
+  "limitations": [
+    "Nominal catalog V magnitude is not live photometry; variable stars vary.",
+    "Resolved catalog components are not recombined into unresolved naked-eye system brightness.",
+    "This subset retains J2000.0 positions; the consumer must handle frame/date transforms and observer location.",
+    "Proper motion is retained in the original CSV but not applied by this static API.",
+    "Atmospheric extinction, terrain, buildings, clouds and light pollution are not encoded in the catalog."
+  ],
+  "outputs": [
+    {
+      "path": "assets/star-catalog/bright-stars-v41-mag3.json",
+      "bytes": 38510,
+      "sha256": "bbda741f03da9327843e62073b245329983a9659086c633699ebe39f1cd95f75"
+    },
+    {
+      "path": "source/BrightStarCatalog.swift",
+      "bytes": 32131,
+      "sha256": "08dddcdf3e91a1d2b199e455d76153c57495b8404868bc392e88eeec95b2807a"
+    }
+  ],
+  "scripts": [
+    {
+      "path": "scripts/fetch_hyg_source.py",
+      "sha256": "0e9a5021648d3f09d98259f14356db377bb7e0485aa286dafe031d1445022947"
+    },
+    {
+      "path": "scripts/prepare_bright_stars.py",
+      "sha256": "5a3c30306d02721a03d43ae97ab900375910f3cd7b5abc42a62cd5fe182037a2"
+    }
+  ]
+}

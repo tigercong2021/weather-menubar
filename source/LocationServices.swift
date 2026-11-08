@@ -30,7 +30,7 @@ struct LocationFix: Sendable {
     fileprivate init?(_ location: CLLocation, now: Date) {
         let age = now.timeIntervalSince(location.timestamp)
         guard CLLocationCoordinate2DIsValid(location.coordinate),
-              (0...10_000).contains(location.horizontalAccuracy),
+              (0...2_000).contains(location.horizontalAccuracy),
               (-15...180).contains(age) else { return nil }
         latitude = location.coordinate.latitude
         longitude = location.coordinate.longitude
@@ -66,7 +66,7 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
     override init() {
         super.init()
         reportedAuthorization = authorization
-        authorizationManager.desiredAccuracy = kCLLocationAccuracyKilometer
+        authorizationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         authorizationManager.delegate = self
     }
 
@@ -124,7 +124,7 @@ private final class LocationRequest: NSObject, @preconcurrency CLLocationManager
                     do { try await Task.sleep(for: .seconds(18)) } catch { return }
                     self?.fail(LocationError.timeout)
                 }
-                manager.desiredAccuracy = kCLLocationAccuracyKilometer
+                manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
                 manager.delegate = self
                 manager.requestLocation()
             }
@@ -197,8 +197,18 @@ enum CityLookup {
                 if let error {
                     complete(.failure(error))
                 } else {
-                    let city = items?.lazy.compactMap {
-                        clean($0.addressRepresentations?.cityName)
+                    let city = items?.lazy.compactMap { item in
+                        // The modern display-address API exposes a city but no
+                        // structured district. Keep this compatibility bridge;
+                        // never infer a district from street/full-address text.
+                        let placemark = item.placemark
+                        let precise = fix.accuracy <= 500
+                        return LocationAreaLabel.displayName(
+                            city: placemark.locality ?? item.addressRepresentations?.cityName,
+                            subLocality: placemark.subLocality,
+                            subAdministrativeArea: placemark.subAdministrativeArea,
+                            administrativeArea: placemark.administrativeArea,
+                            countryCode: placemark.isoCountryCode, allowDistrict: precise)
                     }.first
                     complete(.success(city))
                 }

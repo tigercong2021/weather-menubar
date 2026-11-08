@@ -3,3 +3,7 @@
 /validation/*.gif
 /validation/*.mp4
 /validation/*.png
+__pycache__/
+*.pyc
+*.dmg
+*.app/

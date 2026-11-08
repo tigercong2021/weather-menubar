@@ -31,15 +31,19 @@ struct WeatherHour: Codable, Sendable, Equatable, Identifiable {
     /// Probability and mean UV for the hour ending at this timestamp.
     let rainProbability: Double?
     let uvIndex: Double?
+    /// Total precipitation (rain, showers and snow water equivalent), in mm,
+    /// during the hour ending at this timestamp. Missing values stay unknown.
+    let precipitation: Double?
 
     init(time: Date, temperature: Double?, code: Int?, daylight: Bool?,
-         rainProbability: Double? = nil, uvIndex: Double? = nil) {
+         rainProbability: Double? = nil, uvIndex: Double? = nil, precipitation: Double? = nil) {
         self.time = time
         self.temperature = temperature
         self.code = code
         self.daylight = daylight
         self.rainProbability = rainProbability
         self.uvIndex = uvIndex
+        self.precipitation = precipitation.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
     }
 
     var id: Date { time }
@@ -305,9 +309,11 @@ struct WeatherClient: Sendable {
 
     static func request(for coordinate: WeatherCoordinate) throws -> URLRequest {
         guard coordinate.isValid else { throw Failure.invalidCoordinate }
-        // Use one decimal (~11 km of latitude). The place label and original coordinate stay local.
+        // District-aware query precision (~1 km of latitude). This is not a
+        // claim about model resolution; the full fix and address remain local.
         func approximate(_ degrees: Double) -> String {
-            String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), (degrees * 10).rounded() / 10)
+            let rounded = (degrees * 100).rounded() / 100
+            return String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), rounded == 0 ? 0 : rounded)
         }
         var components = URLComponents()
         components.scheme = "https"
@@ -322,7 +328,7 @@ struct WeatherClient: Sendable {
             ("latitude", approximate(coordinate.latitude)),
             ("longitude", approximate(coordinate.longitude)),
             ("current", currentFields.joined(separator: ",")),
-            ("hourly", "temperature_2m,weather_code,is_day,precipitation_probability,uv_index"),
+            ("hourly", "temperature_2m,weather_code,is_day,precipitation_probability,uv_index,precipitation"),
             ("daily", "temperature_2m_max,temperature_2m_min,sunrise,sunset,weather_code"),
             ("timezone", "auto"), ("timeformat", "unixtime"), ("forecast_days", "4"),
             ("temperature_unit", "celsius"), ("precipitation_unit", "mm"), ("wind_speed_unit", "kmh")
@@ -361,7 +367,8 @@ struct WeatherClient: Sendable {
                                    code: hourly.weather_code?[safe: index] ?? nil,
                                    daylight: daylight(hourly.is_day?[safe: index] ?? nil),
                                    rainProbability: within(0...100, hourly.precipitation_probability?[safe: index] ?? nil),
-                                   uvIndex: within(0...Double.greatestFiniteMagnitude, hourly.uv_index?[safe: index] ?? nil))
+                                   uvIndex: within(0...Double.greatestFiniteMagnitude, hourly.uv_index?[safe: index] ?? nil),
+                                   precipitation: within(0...Double.greatestFiniteMagnitude, hourly.precipitation?[safe: index] ?? nil))
             }.sorted { $0.time < $1.time }
         } ?? []
         let interval = current.interval ?? 0
@@ -450,6 +457,7 @@ private struct OpenMeteoResponse: Decodable {
         let weather_code: [Int?]?
         let is_day: [Int?]?
         let precipitation_probability: [Double?]?
+        let precipitation: [Double?]?
         let uv_index: [Double?]?
     }
 }

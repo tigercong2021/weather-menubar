@@ -1,0 +1,4 @@
+module AstronomyEngine {
+    header "astronomy.h"
+    export *
+}

@@ -1,6 +1,59 @@
 import AppKit
 import SwiftUI
 
+private struct WeatherPanelMaximumHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension EnvironmentValues {
+    var weatherPanelMaximumHeight: CGFloat? {
+        get { self[WeatherPanelMaximumHeightKey.self] }
+        set { self[WeatherPanelMaximumHeightKey.self] = newValue }
+    }
+}
+
+/// The screen budget is independent of the window's current content height.
+@MainActor
+final class WeatherPanelLimits: ObservableObject {
+    @Published var maximumHeight: CGFloat?
+    init(maximumHeight: CGFloat? = nil) { self.maximumHeight = maximumHeight }
+}
+
+/// Report only the currently displayed list page or complete city details.
+struct WatchedWeatherNaturalHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat { 0 }
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+func watchedCityPageRanges(rowHeights: [CGFloat], availableHeight: CGFloat?,
+                           spacing: CGFloat = 8, controlsHeight: CGFloat = 32) -> [Range<Int>] {
+    guard !rowHeights.isEmpty else { return [] }
+    let heights = rowHeights.map { $0.isFinite && $0 > 0 ? $0 : 96 }
+    let gap = max(0, spacing)
+    let total = heights.reduce(0, +) + CGFloat(heights.count - 1) * gap
+    guard let availableHeight, availableHeight.isFinite, total > max(0, availableHeight) else {
+        return [0..<heights.count]
+    }
+    let capacity = max(0, availableHeight - max(0, controlsHeight))
+    var pages: [Range<Int>] = []
+    var start = 0
+    var used: CGFloat = 0
+    for index in heights.indices {
+        let next = heights[index] + (index == start ? 0 : gap)
+        if index > start, used + next > capacity {
+            pages.append(start..<index)
+            start = index
+            used = heights[index]
+        } else {
+            used += next
+        }
+    }
+    pages.append(start..<heights.count)
+    return pages
+}
+
 /// AppKit screen coordinates have their origin at the bottom. Fix the top edge
 /// before choosing the height so fresh weather or AQI rows grow downwards.
 func anchoredWeatherPanelFrame(button: NSRect, visibleFrame: NSRect, panelSize: NSSize,
@@ -22,6 +75,7 @@ final class AnchoredWeatherPanel: NSObject {
     private let window: WeatherPanelWindow
     private weak var button: NSStatusBarButton?
     private var contentSize = defaultContentSize
+    private let limits = WeatherPanelLimits()
     private var localMonitor: Any?
     private var globalMonitor: Any?
     private var pageSwipeDistance: CGFloat = 0
@@ -52,7 +106,7 @@ final class AnchoredWeatherPanel: NSObject {
         window.becomesKeyOnlyIfNeeded = false
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .transient, .ignoresCycle]
 
-        let host = NSHostingController(rootView: WeatherPanelViewport(content: rootView) { [weak self] size in
+        let host = NSHostingController(rootView: WeatherPanelViewport(content: rootView, limits: limits) { [weak self] size in
             // Apply the AppKit frame outside SwiftUI's layout transaction.
             Task { @MainActor [weak self] in self?.updateContentSize(size) }
         })
@@ -105,6 +159,9 @@ final class AnchoredWeatherPanel: NSObject {
         let center = NSPoint(x: buttonRect.midX, y: buttonRect.midY)
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) })
                 ?? button?.window?.screen ?? NSScreen.main else { return nil }
+        let maximum = anchoredWeatherPanelFrame(button: buttonRect, visibleFrame: screen.visibleFrame,
+                                               panelSize: NSSize(width: contentSize.width, height: .greatestFiniteMagnitude)).height
+        if limits.maximumHeight != maximum { limits.maximumHeight = maximum }
         return anchoredWeatherPanelFrame(button: buttonRect, visibleFrame: screen.visibleFrame, panelSize: contentSize)
     }
 
@@ -271,11 +328,35 @@ private final class WeatherPanelSurface: NSView {
 private struct WeatherPanelViewport: View {
     let content: WeatherPanel
     let contentSizeDidChange: @MainActor (CGSize) -> Void
+    @ObservedObject private var model: WeatherModel
+    @ObservedObject private var limits: WeatherPanelLimits
+
+    init(content: WeatherPanel, limits: WeatherPanelLimits = WeatherPanelLimits(),
+         contentSizeDidChange: @escaping @MainActor (CGSize) -> Void) {
+        self.content = content
+        self.contentSizeDidChange = contentSizeDidChange
+        _model = ObservedObject(wrappedValue: content.model)
+        _limits = ObservedObject(wrappedValue: limits)
+    }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: WeatherPanelSurface.cornerRadius)
-        ScrollView(.vertical) {
-            content.onGeometryChange(for: CGSize.self, of: { $0.size }, action: contentSizeDidChange)
+        GeometryReader { _ in
+            if model.showsWatchedWeather {
+                // Watched pages never scroll; screen overflow is handled by pages.
+                content
+                    .environment(\.weatherPanelMaximumHeight, limits.maximumHeight)
+                    .onPreferenceChange(WatchedWeatherNaturalHeightKey.self) { height in
+                        guard height.isFinite, height > 0 else { return }
+                        contentSizeDidChange(CGSize(width: 348, height: height))
+                    }
+            } else {
+                ScrollView(.vertical) {
+                    content.onGeometryChange(for: CGSize.self, of: { $0.size }, action: contentSizeDidChange)
+                }
+                // `.hidden` may reserve a legacy scrollbar gutter on macOS.
+                .scrollIndicators(.never)
+            }
         }
         .clipShape(shape)
         .overlay {

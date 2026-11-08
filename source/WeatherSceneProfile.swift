@@ -34,7 +34,9 @@ struct WeatherSceneProfile {
         case 53, 55, 57, 63, 81: rain = .moderate
         case 65, 67, 82: rain = .heavy
         case 95, 96, 97, 99:
-            rain = rainRate >= 7 || code == 97 || code == 99 ? .heavy : .moderate
+            // 99 specifies heavy hail, not heavy rain. Keep hail severity below
+            // independent of this visual rain-rate tuning and code 97's storm tier.
+            rain = rainRate >= 7 || code == 97 ? .heavy : .moderate
         default: rain = nil
         }
 

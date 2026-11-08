@@ -61,7 +61,7 @@ struct WeatherDetailsGrid: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(.quaternary.opacity(0.52), in: RoundedRectangle(cornerRadius: 8))
+                .weatherGlassCard(cornerRadius: 8)
             }
         }
     }
@@ -84,7 +84,7 @@ struct WeatherDetailsGrid: View {
         .frame(maxWidth: .infinity, minHeight: 45, alignment: .topLeading)
         .padding(.horizontal, 7)
         .padding(.vertical, 5)
-        .background(.quaternary.opacity(0.52), in: RoundedRectangle(cornerRadius: 8))
+        .weatherGlassCard(cornerRadius: 8)
         .accessibilityElement(children: .combine)
     }
 

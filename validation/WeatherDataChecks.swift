@@ -146,7 +146,7 @@ struct WeatherDataChecks {
         let request = try WeatherClient.request(for: place.coordinate)
         let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
         let values = Dictionary(uniqueKeysWithValues: query.compactMap { item in item.value.map { (item.name, $0) } })
-        precondition(values["latitude"] == "31.2" && values["longitude"] == "121.5")
+        precondition(values["latitude"] == "31.23" && values["longitude"] == "121.46")
         precondition(values["timezone"] == "auto" && values["timeformat"] == "unixtime")
         precondition(values["forecast_days"] == "4" && values["daily"]?.contains("weather_code") == true)
         precondition(values["temperature_unit"] == "celsius" && values["precipitation_unit"] == "mm")
@@ -177,6 +177,7 @@ struct WeatherDataChecks {
             precondition(live.place == publicExample && live.timezone == "Asia/Shanghai")
             precondition(live.age(at: now) < 3600 && live.isDay(at: now) != nil)
             precondition(live.highLow(at: now).high != nil && live.nextHours(at: now).count == 6)
+            precondition(live.nextHours(at: now).allSatisfy { $0.precipitation != nil && $0.rainProbability != nil })
             precondition(live.gust != nil)
             guard let details = live.details else { preconditionFailure("Live weather details were absent") }
             precondition([details.feelsLike, details.humidity, details.windSpeed, details.windDirection,

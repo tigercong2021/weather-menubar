@@ -147,6 +147,70 @@ enum WeatherDemo: String, CaseIterable, Identifiable {
         default: return 0.48
         }
     }
+
+    /// Explicit gallery clock: real Shanghai daytime/nighttime on the selected
+    /// calendar date, with dawn/dusk derived from actual solar horizon events.
+    @MainActor
+    func sceneDate(relativeTo now: Date) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        let daytime = calendar.date(bySettingHour: 10, minute: 30, second: 0, of: now)!
+        if self == .dawn || self == .dusk {
+            let events = NightSkyAstronomy.sunEvents(dayStartingAt: calendar.startOfDay(for: now),
+                                                     coordinate: .init(latitude: 31.2, longitude: 121.5))
+            if self == .dawn, let sunrise = events.sunrise { return sunrise + 20 * 60 }
+            if self == .dusk, let sunset = events.sunset { return sunset - 20 * 60 }
+        }
+        return isDay ? daytime : calendar.date(bySettingHour: 21, minute: 30, second: 0, of: now)!
+    }
+
+    /// Synthetic weather at the supplied absolute instant. Solar metadata uses
+    /// that instant and place; it never forces daytime by fabricating sun times.
+    @MainActor
+    func snapshot(at now: Date, place: WeatherPlace? = nil) -> WeatherSnapshot {
+        let place = place ?? WeatherPlace(name: "模拟场景", coordinate: .init(latitude: 31.2, longitude: 121.5))
+        let timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: now)
+        let localDate = (parts.year ?? 0) * 10_000 + (parts.month ?? 0) * 100 + (parts.day ?? 0)
+        let events = NightSkyAstronomy.sunEvents(dayStartingAt: calendar.startOfDay(for: now), coordinate: place.coordinate)
+        let daylight = NightSkyAstronomy.sky(at: now, coordinate: place.coordinate).map { $0.sun.altitudeDegrees >= 0 }
+        let temperature: Double
+        switch self {
+        case .sun: temperature = 26
+        case .dawn: temperature = 17
+        case .dusk: temperature = 23
+        case .moon, .overcastNight: temperature = 14
+        case .freezingFog, .freezingDrizzle, .freezingRain, .mixed: temperature = -1
+        case .snow, .heavySnow, .snowGrains, .snowShowers, .blowingSnow: temperature = -4
+        default: temperature = 19
+        }
+        let firstHour = Date(timeIntervalSince1970: (floor(now.timeIntervalSince1970 / 3600) + 1) * 3600)
+        let amounts = [1.0, 0.65, 0.2, 0.05, 0, 0].map { $0 * intensity }
+        let hours = amounts.enumerated().map { index, amount in
+            let time = firstHour + Double(index) * 3600
+            let hourIsDay = NightSkyAstronomy.sky(at: time, coordinate: place.coordinate).map { $0.sun.altitudeDegrees >= 0 }
+            return WeatherHour(time: time,
+                        temperature: temperature - Double(index / 2),
+                        code: intensity == 0 || amount >= 0.1 ? code : 3,
+                        daylight: hourIsDay, rainProbability: amount >= 0.1 ? 75 : intensity > 0 ? 15 : 5,
+                        uvIndex: hourIsDay == true ? 2 : 0, precipitation: amount)
+        }
+        return WeatherSnapshot(
+            place: place,
+            temperature: temperature, code: code, intensity: intensity,
+            validAt: now, fetchedAt: now, timezone: timeZone.identifier,
+            utcOffsetSeconds: timeZone.secondsFromGMT(for: now), currentDaylight: daylight,
+            hours: hours,
+            days: [WeatherDay(localDate: localDate, high: temperature + 2, low: temperature - 4,
+                              sunrise: events.sunrise, sunset: events.sunset, weatherCode: code)],
+            gust: gust,
+            details: WeatherCurrentDetails(feelsLike: temperature - 2, humidity: intensity > 0 ? 88 : 55,
+                                           windSpeed: windSpeed ?? gust.map { $0 * 0.55 },
+                                           windDirection: windDirection, pressure: 1012, dewPoint: temperature - 3),
+            mixedPrecipitation: self == .mixed ? true : nil)
+    }
 }
 
 struct WeatherMotionPreview: View {
@@ -156,7 +220,9 @@ struct WeatherMotionPreview: View {
 
     var body: some View {
         let sample = model.previewWeather
-        let isDay = sample.isDay
+        let sceneDate = sample.sceneDate(relativeTo: model.now)
+        let snapshot = sample.snapshot(at: sceneDate)
+        let daylight = snapshot.isDay(at: sceneDate) ?? sample.isDay
         let cyclone = sample == .typhoon
         return VStack(alignment: .leading, spacing: 11) {
             Picker("模拟天气", selection: $model.previewWeather) {
@@ -170,56 +236,94 @@ struct WeatherMotionPreview: View {
             }
             .controlSize(.small)
 
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(sample.rawValue).font(.system(size: 24, weight: .semibold))
-                    Text("模拟场景").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                CurrentWeatherIcon(motion: motion, renderer: renderer, code: sample.iconCode,
-                                   daylight: isDay, intensity: sample.intensity,
-                                   gust: sample.gust, cycloneDemo: cyclone)
-            }
-            .padding(15)
-            .frame(minHeight: 128)
-            .background {
-                ZStack {
-                    WeatherSky(code: sample.code, daylight: isDay, airTint: nil,
-                               daylightProgress: sample.daylightProgress)
+            VStack(spacing: 7) {
+                Text("\(Int(snapshot.temperature.rounded()))°")
+                    .font(.system(size: 65, weight: .thin, design: .rounded))
+                    .monospacedDigit()
+                    .shadow(color: .black.opacity(0.15), radius: 7, y: 2)
+                HStack(spacing: 7) {
+                    CurrentWeatherIcon(motion: motion, renderer: renderer, code: sample.iconCode,
+                                       daylight: daylight, intensity: sample.intensity, size: 23,
+                                       gust: sample.gust, cycloneDemo: cyclone)
                         .accessibilityHidden(true)
-                    WeatherScene(motion: motion, code: sample.code, isDay: isDay,
-                                 intensity: sample.intensity, gust: sample.gust, cycloneDemo: cyclone,
-                                 windSpeed: sample.windSpeed, windDirection: sample.windDirection,
-                                 daylightProgress: sample.daylightProgress, special: sample.special)
-                        .accessibilityHidden(true)
+                    Text(sample.rawValue).font(.system(size: 18, weight: .medium))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                Text("模拟场景 · 非实时预报")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.76))
+                Text("模拟时刻 · \(clockLabel(sceneDate, in: snapshot.locationTimeZone))（上海）")
+                    .font(.system(size: 9)).foregroundStyle(.white.opacity(0.7))
             }
-            .environment(\.colorScheme, isDay ? .light : .dark)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 163)
+
+            PrecipitationTrendCard(snapshot: snapshot, now: sceneDate)
+            hourlySamples(snapshot)
 
             HStack(spacing: 8) {
                 CurrentWeatherIcon(motion: motion, renderer: renderer, code: sample.iconCode,
-                                   daylight: isDay, intensity: sample.intensity, size: 18,
+                                   daylight: daylight, intensity: sample.intensity, size: 18,
                                    gust: sample.gust, cycloneDemo: cyclone)
-                Text("菜单栏图标预览").font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("菜单栏图标预览").font(.system(size: 10, weight: .medium))
+                    Text("此页天气与数值均为演示")
+                        .font(.system(size: 9)).foregroundStyle(.secondary)
+                }
                 Spacer()
             }
+            .padding(10)
+            .weatherGlassCard()
 
             if cyclone {
-                Text("此处仅展示台风动效。当地预警请查阅官方气象信息。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Link("中央气象台台风网", destination: URL(string: "https://typhoon.nmc.cn/web.html")!)
-                    .font(.caption2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("台风动效仅供模拟；当地预警以官方信息为准。")
+                    Link("中央气象台台风网", destination: URL(string: "https://typhoon.nmc.cn/web.html")!)
+                }
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
             } else if sample == .haze {
                 Text("此场景仅供预览，实时天气没有独立识别。")
-                    .font(.caption2)
+                    .font(.system(size: 9))
                     .foregroundStyle(.secondary)
             } else if sample == .mixed {
                 Text("实时画面在同一模型时段同时返回雨和雪时使用此效果。")
-                    .font(.caption2)
+                    .font(.system(size: 9))
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func hourlySamples(_ snapshot: WeatherSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("逐小时预报 · 演示数据")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 0) {
+                ForEach(snapshot.hours) { hour in
+                    VStack(spacing: 6) {
+                        Text(clockLabel(hour.time, in: snapshot.locationTimeZone))
+                            .font(.system(size: 10)).monospacedDigit()
+                        ForecastWeatherIcon(code: hour.code, daylight: hour.daylight, size: 18)
+                            .frame(height: 22)
+                        Text("\(Int(hour.rainProbability ?? 0))%")
+                            .font(.system(size: 10, weight: .medium)).monospacedDigit()
+                            .foregroundStyle(Color(red: 0.48, green: 0.81, blue: 1))
+                        Text("\(Int((hour.temperature ?? 0).rounded()))°")
+                            .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(10)
+        .weatherGlassCard()
+    }
+
+    private func clockLabel(_ date: Date, in timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 }
